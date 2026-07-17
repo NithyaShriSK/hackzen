@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+venv/
+.env/
+
+# Generated files
+processed_video/
+outputs/
+
+# Input videos
+input/
+
+# IDE
+.vscode/
+.idea/
+__pycache__/
+*.py[cod]
+processed_video/
+input/
+outputs/
+.vscode/
+.idea/
