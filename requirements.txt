@@ -1,6 +1,9 @@
-streamlit 
-opencv-python 
-shapely 
-pandas 
-numpy 
+streamlit
+opencv-python
+shapely
+pandas
+numpy
 plotly
+supervision
+ultralytics
+tqdm
