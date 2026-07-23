@@ -1,95 +1,25 @@
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
 *.py[cod]
-*$py.class
-# C extensions
-*.so
-
-# Distribution / packaging
-build/
-dist/
-*.egg-info/
-.eggs/
-pip-wheel-metadata/
 
 # Virtual environments
-.env
-.venv
-env/
 venv/
-hackz/
-pyvenv.cfg
+.env/
 
-# VS Code and IDEs
+# Generated files
+processed_video/
+outputs/
+
+# Input videos
+input/
+
+# IDE
 .vscode/
 .idea/
-*.sublime-project
-*.sublime-workspace
-
-# Jupyter
-.ipynb_checkpoints/
-
-# Logs and databases
-*.log
-logs/
-*.sqlite3
-*.db
-
-# PyTest, coverage, mypy
-.pytest_cache/
-.coverage
-htmlcov/
-.mypy_cache/
-.pyre/
-.pytype/
-
-# Environment variables / secrets
-.env
-.env.*
-secrets/
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Temporary files
-*.swp
-*.bak
-*.tmp
-
-# Data, models, and training outputs (common for ML projects)
-data/
-processed_video/
-runs/
-detect/train/
-train/
-weights/
-results/
-*.pt
-*.pth
-*.ckpt
-*.h5
-
-# Large archives
-*.zip
-*.tar.gz
-
-# Video files
-*.mp4
-*.avi
-*.mov
-*.mkv
-
-# Cache files
-*.cache
-
-# Large data files (specific to this project)
-retail_tracking_data.json
-
-# Editor backup
-*~
 __pycache__/
-*.pyc
-venv/
-.venv/
+*.py[cod]
 processed_video/
+input/
+outputs/
+.vscode/
+.idea/

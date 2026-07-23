@@ -1,86 +1,64 @@
-from config import TRACKS_FILE
-from core.utils import load_json
+import sys
+from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parent
+sys.path.append(str(ROOT_DIR))
+
+# Import model_run from model.py
+from model import model_run
+from core.parser import TrackParser
 from core.roi_mapper import ROIMapper
 from core.event_engine import EventEngine
 from core.timeline import TimelineGenerator
-from core.video_preprocessor import VideoPreprocessor
-from model import model_run
 
-def main():
-    print("=" * 50)
-    print(" Human Activity Timeline Generator ")
-    print("=" * 50)
 
-    # Run model to generate tracking data
-    print("Running model to generate tracking data...")
-    model_run()
-    print("✓ Model execution completed")
+def run_pipeline(video_path: str):
+    print("=" * 60)
+    print("STEP 1: Running Model Detection & Tracking")
+    print("=" * 60)
 
-    # video_path = "sample1.mp4"  # Change filename if needed
+    # 1. RUN MODEL FIRST
+    tracks_json_path = model_run(video_path)
+    
+    if not tracks_json_path:
+        raise RuntimeError("Model execution failed.")
 
-    # try:
-    #     preprocessor = VideoPreprocessor(video_path)
-    #     metadata = preprocessor.process()
+    print("\n" + "=" * 60)
+    print("STEP 2: Running Analytics Pipeline")
+    print("=" * 60)
 
-    #     print("✓ Video preprocessing completed")
-    #     print(metadata)
+    # 2. PARSE TRACKS
+    parser = TrackParser()
+    tracks = parser.load()
+    print(f"✓ Parsed {len(tracks)} person detections")
 
-    # except Exception as e:
-    #     print(e)
-
-    # 1. Load Tracks FIRST
-    try:
-        tracks = load_json(TRACKS_FILE)
-    except Exception:
-        tracks = load_json("data/tracks.json")
-
-    if not tracks:
-        print("No tracks found.")
-        return
-
-    # 2. Extract track dicts if tracks.json is structured by frame or track_id
-    all_track_objects = []
-
-    if isinstance(tracks, dict):
-        for key, val in tracks.items():
-            if isinstance(val, list):
-                # Frame-based dict e.g., {"0": [{track1}, {track2}]}
-                all_track_objects.extend(val)
-            elif isinstance(val, dict):
-                # ID-based dict e.g., {"track_1": {track1}}
-                all_track_objects.append(val)
-    elif isinstance(tracks, list):
-        all_track_objects = tracks
-
-    # 3. ROI Mapping
+    # 3. ROI MAPPING
     roi_mapper = ROIMapper()
-    mapped_tracks = roi_mapper.map_tracks(all_track_objects)
+    mapped_tracks = roi_mapper.map_tracks(tracks)
+    print("✓ ROI Mapping Completed")
 
-    print(f"✓ ROI Mapping completed ({len(mapped_tracks)} track instances)")
+    # 4. EVENT ENGINE
+    engine = EventEngine()
+    events = engine.process(mapped_tracks)
+    print(f"✓ Generated timelines for {len(events)} customer(s)")
 
-    # 4. Event Detection
-    event_engine = EventEngine()
-    events = event_engine.process(mapped_tracks)
+    # 5. GENERATE & SAVE OUTPUTS
+    timeline = TimelineGenerator()
+    outputs = timeline.generate(events)
+    output_path = timeline.save(outputs)
 
-    print(f"✓ Events generated for {len(events)} persons")
+    print(f"✓ Timeline Saved : {output_path}")
+    print("✓ Analytics Saved : data/analytics.json")
+    print("✓ Heatmap Saved : data/heatmap.json")
+    print("✓ Paths Saved : data/paths.json")
 
-    # 5. Timeline Generation
-    timeline_generator = TimelineGenerator()
-    timeline = timeline_generator.generate(events)
+    print("=" * 60)
+    print("Pipeline Completed Successfully")
+    print("=" * 60)
 
-    print("✓ Timeline saved successfully.")
-
-    print("\n========== SUMMARY ==========")
-    for person_id, person_events in timeline.items():
-        print(f"\nPerson {person_id}")
-
-        for event in person_events:
-            print(
-                f"{event['time']}  |  "
-                f"{event['event']}  |  "
-                f"{event['zone']}"
-            )
+    return output_path
 
 
 if __name__ == "__main__":
-    main()
+    # Standard terminal run fallback
+    run_pipeline("sample1.mp4")

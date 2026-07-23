@@ -1,237 +1,313 @@
 import sys
+import os
+import json
+import tempfile
 from pathlib import Path
-import tempfile
-import tempfile
-
 import streamlit as st
 import pandas as pd
 
-# Allow imports from project root
+# -------------------------------------------------------------------
+# Path Setup: Add project root to sys.path
+# -------------------------------------------------------------------
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.append(str(ROOT_DIR))
 
-from config import TIMELINE_FILE, TRACKS_FILE
+from config import TIMELINE_FILE
 from core.utils import load_json
-from model import model_run
-from core.roi_mapper import ROIMapper
-from core.event_engine import EventEngine
-from core.timeline import TimelineGenerator
-from model import model_run
-from core.roi_mapper import ROIMapper
-from core.event_engine import EventEngine
-from core.timeline import TimelineGenerator
+from main import run_pipeline
 
+# -------------------------------------------------------------------
+# Page Config & Custom Styling
+# -------------------------------------------------------------------
 st.set_page_config(
-    page_title="Human Activity Timeline",
-    page_icon="📹",
-    layout="wide"
+    page_title="RetailPulse AI - Customer Activity Intelligence",
+    page_icon="🛍️",
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 
-st.title("📹 Human Activity Timeline Generator")
-
-# Center the video upload section
-col1, col2, col3 = st.columns([1, 2, 1])
-
-with col2:
-    st.markdown("### Upload Video")
-    uploaded_video = st.file_uploader("Choose a video file", type=["mp4", "avi", "mov"], label_visibility="collapsed")
+st.markdown("""
+<style>
+    /* Main Background */
+    .stApp {
+        background-color: #0F172A;
+        color: #F8FAFC;
+    }
     
-    if uploaded_video:
-        st.success(f"Video uploaded: {uploaded_video.name}")
-        
-        if st.button("Process Video", use_container_width=True, type="primary"):
-            # Save uploaded video to temp file (not saved permanently)
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_file:
-                tmp_file.write(uploaded_video.read())
-                video_path = tmp_file.name
-            
-            with st.spinner("Processing video... This may take a while."):
-                try:
-                    # Step 1: Run model to generate tracking data
-                    st.write("🔄 Running YOLO model for object detection and tracking...")
-                    model_run(video_path)
-                    st.success("✓ Model processing completed")
-                    
-                    # Step 2: Load tracks
-                    st.write("🔄 Loading tracking data...")
-                    tracks = load_json(TRACKS_FILE)
-                    
-                    if not tracks:
-                        st.error("No tracks found after model processing.")
-                        st.stop()
-                    
-                    # Step 3: ROI Mapping
-                    st.write("🔄 Mapping tracks to ROIs...")
-                    roi_mapper = ROIMapper()
-                    mapped_tracks = roi_mapper.map_tracks(tracks)
-                    st.success(f"✓ ROI Mapping completed ({len(mapped_tracks)} frames)")
-                    
-                    # Step 4: Event Detection
-                    st.write("🔄 Generating events...")
-                    event_engine = EventEngine()
-                    events = event_engine.process(mapped_tracks)
-                    st.success(f"✓ Events generated for {len(events)} persons")
-                    
-                    # Step 5: Timeline Generation
-                    st.write("🔄 Generating timeline...")
-                    timeline_generator = TimelineGenerator()
-                    timeline = timeline_generator.generate(events)
-                    st.success("✓ Timeline saved successfully")
-                    
-                    st.info("✅ Processing complete! View the timeline below.")
-                    
-                except Exception as e:
-                    st.error(f"Error during processing: {str(e)}")
-                    st.stop()
-                
-                finally:
-                    # Clean up temp file (don't save uploaded video permanently)
-                    if Path(video_path).exists():
-                        Path(video_path).unlink()
+    /* Hero Header */
+    .hero-container {
+        text-align: center;
+        padding: 2rem 1rem 1.5rem 1rem;
+        background: linear-gradient(180deg, #1E293B 0%, #0F172A 100%);
+        border-bottom: 1px solid #334155;
+        border-radius: 12px;
+        margin-bottom: 2rem;
+    }
+    .app-title {
+        font-size: 2.8rem;
+        font-weight: 800;
+        background: linear-gradient(90deg, #38BDF8, #818CF8);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.2rem;
+    }
+    .app-subtitle {
+        font-size: 1.1rem;
+        color: #94A3B8;
+        font-weight: 400;
+    }
 
-# Load existing timeline if available (either from processing or previous runs)
-# Initialize session state for tracking processing status
-if 'processing_complete' not in st.session_state:
-    st.session_state.processing_complete = False
-
-# Center the video upload section
-col1, col2, col3 = st.columns([1, 2, 1])
-
-with col2:
-    st.markdown("### Upload Video")
-    uploaded_video = st.file_uploader("Choose a video file", type=["mp4", "avi", "mov"], label_visibility="collapsed")
+    /* Metric Cards */
+    [data-testid="stMetricValue"] {
+        font-size: 2rem !important;
+        font-weight: 700;
+        color: #38BDF8 !important;
+    }
     
-    if uploaded_video:
-        st.success(f"Video uploaded: {uploaded_video.name}")
-        
-        if st.button("Process Video", use_container_width=True, type="primary"):
-            # Save uploaded video to temp file (not saved permanently)
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_file:
-                tmp_file.write(uploaded_video.read())
-                video_path = tmp_file.name
-            
-            # Validate the video file before processing
-            try:
-                import cv2
-                test_cap = cv2.VideoCapture(video_path)
-                if not test_cap.isOpened():
-                    st.error("Invalid video file. Could not open the uploaded video.")
-                    Path(video_path).unlink()
-                    st.stop()
-                test_cap.release()
-                st.success("Video file validated successfully")
-            except Exception as e:
-                st.error(f"Video validation failed: {str(e)}")
-                if Path(video_path).exists():
-                    Path(video_path).unlink()
-                st.stop()
-            
-            with st.spinner("Processing video... This may take a while."):
-                try:
-                    # Step 1: Run model to generate tracking data
-                    st.write("🔄 Running YOLO model for object detection and tracking...")
-                    model_run(video_path)
-                    st.success("✓ Model processing completed")
-                    
-                    # Step 2: Load tracks
-                    st.write("🔄 Loading tracking data...")
-                    tracks = load_json(TRACKS_FILE)
-                    
-                    if not tracks:
-                        st.error("No tracks found after model processing.")
-                        st.stop()
-                    
-                    # Step 3: ROI Mapping
-                    st.write("🔄 Mapping tracks to ROIs...")
-                    roi_mapper = ROIMapper()
-                    mapped_tracks = roi_mapper.map_tracks(tracks)
-                    st.success(f"✓ ROI Mapping completed ({len(mapped_tracks)} frames)")
-                    
-                    # Step 4: Event Detection
-                    st.write("🔄 Generating events...")
-                    event_engine = EventEngine()
-                    events = event_engine.process(mapped_tracks)
-                    st.success(f"✓ Events generated for {len(events)} persons")
-                    
-                    # Step 5: Timeline Generation
-                    st.write("🔄 Generating timeline...")
-                    timeline_generator = TimelineGenerator()
-                    timeline = timeline_generator.generate(events)
-                    st.success("✓ Timeline saved successfully")
-                    
-                    st.info("✅ Processing complete! View the timeline below.")
-                    
-                    # Mark processing as complete in session state
-                    st.session_state.processing_complete = True
-                    
-                except Exception as e:
-                    st.error(f"Error during processing: {str(e)}")
-                    st.stop()
-                
-                finally:
-                    # Clean up temp file (don't save uploaded video permanently)
-                    if Path(video_path).exists():
-                        Path(video_path).unlink()
+    /* Custom Timeline Card */
+    .timeline-card {
+        background-color: #1E293B;
+        border-left: 4px solid #38BDF8;
+        padding: 14px 18px;
+        border-radius: 8px;
+        margin-bottom: 12px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    }
+    .timeline-time {
+        font-size: 0.9rem;
+        color: #38BDF8;
+        font-weight: 700;
+    }
+    .timeline-event {
+        font-size: 1.1rem;
+        color: #FFFFFF;
+        font-weight: 600;
+        margin: 4px 0;
+    }
+    .timeline-zone {
+        font-size: 0.85rem;
+        color: #94A3B8;
+    }
 
-# Only load and show timeline if processing has been completed in this session
-if st.session_state.processing_complete:
+    /* Summary Card Styling */
+    .summary-card {
+        background-color: #1E293B;
+        border: 1px solid #38BDF8;
+        border-radius: 8px;
+        padding: 18px;
+        margin-top: 20px;
+    }
+    .summary-title {
+        color: #38BDF8;
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
+
+    /* Hide Streamlit Default Top Padding */
+    .block-container {
+        padding-top: 1.5rem;
+        padding-bottom: 2rem;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Session State Initialization to prevent past data from rendering on load
+if "processed" not in st.session_state:
+    st.session_state.processed = False
+
+# -------------------------------------------------------------------
+# Hero Banner
+# -------------------------------------------------------------------
+st.markdown("""
+<div class="hero-container">
+    <div class="app-title">🛍️ RetailPulse AI</div>
+    <div class="app-subtitle">Automated Customer Activity, Dwell-Time & Zone Engagement Analytics</div>
+</div>
+""", unsafe_allow_html=True)
+
+# -------------------------------------------------------------------
+# Centered Video Upload & Pipeline Runner
+# -------------------------------------------------------------------
+up_col1, up_col2, up_col3 = st.columns([1, 2, 1])
+
+with up_col2:
+    st.subheader("📹 Upload Retail Surveillance Video")
+    uploaded_file = st.file_uploader(
+        "Choose video file", 
+        type=["mp4", "avi", "mov", "mkv"],
+        label_visibility="collapsed"
+    )
+
+    if uploaded_file is not None:
+        st.success(f"📁 Selected File: **{uploaded_file.name}**")
+        
+        if st.button("🚀 Process Video Pipeline", use_container_width=True, type="primary"):
+            with st.status("Executing Analytics Pipeline...", expanded=True) as status:
+                st.write("📥 Saving video payload...")
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_file:
+                    tmp_file.write(uploaded_file.read())
+                    temp_video_path = tmp_file.name
+
+                try:
+                    st.write("🧠 Running YOLOv11 Detection & BotSORT Tracking...")
+                    st.write("📊 Mapping ROIs and generating timelines...")
+                    
+                    run_pipeline(temp_video_path)
+                    
+                    st.session_state.processed = True
+                    status.update(label="Processing Complete!", state="complete", expanded=False)
+                    st.rerun()
+                except Exception as e:
+                    st.session_state.processed = False
+                    status.update(label="Error Executing Pipeline", state="error", expanded=True)
+                    st.error(f"Details: {e}")
+
+# Stop execution if a video hasn't been processed yet in the current session
+if not st.session_state.processed:
+    st.info("⬆️ Please upload a surveillance video above and click **Process Video Pipeline** to begin analysis.")
+    st.stop()
+
+st.markdown("---")
+
+# -------------------------------------------------------------------
+# Data Loading & Parsing
+# -------------------------------------------------------------------
 timeline = load_json(TIMELINE_FILE)
 
 if not timeline:
-    st.info("👆 Upload a video above to get started, or run `python main.py` to process a video from the command line.")
+    st.warning("No tracking analytics were generated. Please re-process the video.")
     st.stop()
-    
-    # Show results section
-    st.markdown("---")
-    st.markdown("## 📊 Timeline Results")
 
-# Show results section
-st.markdown("---")
-st.markdown("## 📊 Timeline Results")
+events = []
+selected_person = None
+persons = []
 
-persons = sorted(timeline.keys(), key=int)
+if isinstance(timeline, dict):
+    persons = sorted(list(timeline.keys()), key=lambda x: int(x) if str(x).isdigit() else str(x))
+    selected_person = st.selectbox("🎯 Select Tracked Customer ID", persons)
+    events = timeline[selected_person]
 
-# Person selection in main area
-selected_person = st.selectbox(
-    "Select Person to View Timeline",
-    persons,
-    key="person_selector"
-)
+elif isinstance(timeline, list):
+    if len(timeline) > 0 and isinstance(timeline[0], dict) and "events" in timeline[0]:
+        person_map = {str(item.get("person_id", i)): item.get("events", []) for i, item in enumerate(timeline)}
+        persons = sorted(list(person_map.keys()), key=lambda x: int(x) if str(x).isdigit() else str(x))
+        selected_person = st.selectbox("🎯 Select Tracked Customer ID", persons)
+        events = person_map[selected_person]
+    else:
+        df_all = pd.DataFrame(timeline)
+        id_col = next((col for col in ["person_id", "track_id", "id", "customer_id"] if col in df_all.columns), None)
+        if id_col:
+            persons = sorted(df_all[id_col].unique().astype(str), key=lambda x: int(x) if x.isdigit() else x)
+            selected_person = st.selectbox("🎯 Select Tracked Customer ID", persons)
+            events = df_all[df_all[id_col].astype(str) == str(selected_person)].to_dict(orient="records")
+        else:
+            persons = ["Customer #1"]
+            selected_person = "Customer #1"
+            events = timeline
 
-events = timeline[selected_person]
+# -------------------------------------------------------------------
+# Separate Summary Row from Activity Events
+# -------------------------------------------------------------------
+clean_events = []
+summary_data = None
 
-st.subheader(f"Person {selected_person}")
+for e in events:
+    act = str(e.get('activity', e.get('event', ''))).lower()
+    if act == 'summary' or e.get('start') == 'None' or e.get('zone') == 'None':
+        summary_data = e.get('summary', None)
+    else:
+        clean_events.append(e)
 
-if events:
-    df = pd.DataFrame(events)
-    
-    st.dataframe(
-        df,
-        use_container_width=True,
-        hide_index=True
-    )
-    
-    st.markdown("### 📅 Timeline")
-    
-    for event in events:
-        st.markdown(
-            f"""
-            **{event['time']}**
+# -------------------------------------------------------------------
+# Key Performance Metrics Row
+# -------------------------------------------------------------------
+m1, m2, m3, m4 = st.columns(4)
+
+with m1:
+    st.metric("Total Customers Tracked", len(persons))
+
+with m2:
+    st.metric("Total Activities Recorded", len(clean_events))
+
+with m3:
+    zones = set([e.get('zone', e.get('ROI Location', 'N/A')) for e in clean_events])
+    st.metric("Unique Zones Visited", len(zones))
+
+with m4:
+    st.metric("Detection Engine", "YOLOv11m + BotSORT")
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+# -------------------------------------------------------------------
+# Full-Width Activity Stream Section
+# -------------------------------------------------------------------
+st.subheader(f"👤 Activity Stream: Customer #{selected_person}")
+
+tab1, tab2 = st.tabs([" Visual Timeline", "📊 Structured Data Table"])
+
+with tab1:
+    if clean_events:
+        t_col1, t_col2 = st.columns(2)
+        
+        for idx, event in enumerate(clean_events):
+            start_t = event.get('start', event.get('time', 'N/A'))
+            end_t = event.get('end', '')
+            time_display = f"{start_t} - {end_t}" if end_t else start_t
             
-            ➜ **{event['event']}**
-            
-            📍 {event['zone']}
-            
-            ---
+            activity = event.get('activity', event.get('event', 'N/A'))
+            zone = event.get('zone', event.get('ROI Location', 'N/A'))
+            duration = event.get('duration', None)
+            duration_str = f" • Dwell: {duration}s" if duration else ""
+
+            card_html = f"""
+            <div class="timeline-card">
+                <div class="timeline-time">⏱️ {time_display}{duration_str}</div>
+                <div class="timeline-event">➜ {activity}</div>
+                <div class="timeline-zone">📍 Zone: <b>{zone}</b></div>
+            </div>
             """
-        )
-else:
-    st.info("No events found for this person.")
+            
+            if idx % 2 == 0:
+                with t_col1:
+                    st.markdown(card_html, unsafe_allow_html=True)
+            else:
+                with t_col2:
+                    st.markdown(card_html, unsafe_allow_html=True)
+    else:
+        st.info("No timeline activities recorded for this customer.")
 
-# Sidebar for summary stats
-    # Sidebar for summary stats
-st.sidebar.markdown("---")
-st.sidebar.header("Summary")
-    st.sidebar.header("Summary")
-st.sidebar.metric("Total Persons", len(persons))
-st.sidebar.metric("Events for Selected Person", len(events))
+with tab2:
+    if clean_events:
+        df_events = pd.DataFrame(clean_events)
+        
+        # Remove raw summary column from table view
+        if "summary" in df_events.columns:
+            df_events = df_events.drop(columns=["summary"])
+
+        st.dataframe(
+            df_events, 
+            use_container_width=True, 
+            hide_index=True
+        )
+    else:
+        st.info("No tabular data available.")
+
+# -------------------------------------------------------------------
+# Separate Summary Callout Box (Bottom)
+# -------------------------------------------------------------------
+if summary_data:
+    st.markdown('<div class="summary-card">', unsafe_allow_html=True)
+    st.markdown('<div class="summary-title">📝 Customer Journey Summary</div>', unsafe_allow_html=True)
+    
+    if isinstance(summary_data, str) and summary_data.startswith('{'):
+        try:
+            parsed_summary = json.loads(summary_data)
+            for k, v in parsed_summary.items():
+                st.write(f"• **{k.replace('_', ' ').title()}**: {v}")
+        except Exception:
+            st.write(summary_data)
+    else:
+        st.write(str(summary_data))
+        
+    st.markdown('</div>', unsafe_allow_html=True)
